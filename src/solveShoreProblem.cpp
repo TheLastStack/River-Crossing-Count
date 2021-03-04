@@ -5,9 +5,17 @@
 #include <tuple>
 #include <stdexcept>
 #include <algorithm>
+#include <cstddef>
 #include <iostream>
 
+
 using namespace std;
+
+template <class T>
+inline void hash_combine(size_t& seed, T const& v)
+{
+	seed ^= hash<T>()(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
 
 bool next_combination(vector<int>& counter, int limit)
 {
@@ -52,6 +60,7 @@ bool next_combination(vector<int>& counter, int limit)
 	}
 	return returning;
 }
+
 class Shore {
 private:
 	//Saving an array. Each index represents a particular type. 
@@ -86,18 +95,16 @@ public:
 	{
 		;
 	}
-	Shore(vector<int>& a):items_of_type(0)
+	Shore(vector<int>& a):items_of_type(a)
 	{
-		items_of_type = a;
 		for (int i = 0; i < items_of_type.size(); ++i)
 		{
 			if (items_of_type[i] == 0)
 				all_crossed_type.insert(i);
 		}
 	}
-	Shore(vector<int>& a, unordered_set<int>& b):items_of_type(0)
+	Shore(vector<int>& a, unordered_set<int>& b):items_of_type(a)
 	{
-		items_of_type = a;
 		all_crossed_type = b;
 	}
 	Shore(const Shore& a)
@@ -141,9 +148,25 @@ public:
 	{
 		return items_of_type.size();
 	}
+	bool operator==(const Shore& a)
+	{
+		if (a.size() == this->items_of_type.size())
+		{
+			for (int i = 0; i < this->size(); ++i)
+			{
+				if (a.items_at(i) != this->items_of_type[i])
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+		return false;
+	}
 };
 
 class ShoreState {
+	/* Represents a particular state of two shores.*/
 private:
 	Shore left_shore;
 	Shore right_shore;
@@ -177,6 +200,10 @@ public:
 		{
 			delete i;
 		}
+	}
+	bool operator==(const ShoreState& a)
+	{
+		return this->left_shore == a.left_shore && this->right_shore == a.right_shore;
 	}
 	void expandNode()
 	{
@@ -242,52 +269,86 @@ public:
 		}
 		return root_to_soln;
 	}
-	ShoreState get_child()
+	ShoreState get_child() const
 	{
-		return *children.front();
+		// Ensuring no dynamically created copies are visible outside the class.
+		ShoreState a = *children.front()
+		return a;
 	}
-	bool has_children()
+	bool has_children() const
 	{
 		return !children.empty();
 	}
 	ShoreState pop_child()
 	{
+		// Ensuring no dynamically created copies are visible outside the class.
 		ShoreState a = *(children.front());
 		delete children.front();
 		children.pop_front();
 		return a;
 	}
-	bool is_shorestate_soln()
+	bool is_shorestate_soln() const
 	{
 		return left_shore.number_of_types_crossed() == left_shore.size();
 	}
+	size_t hash_code() const
+	{
+		size_t seed = left_shore.size() + right_shore.size();
+		for (int i = 0; i < left_shore.size(); ++i)
+		{
+			hash_combine(seed, left_shore.items_at(i));
+		}
+		for (int i = 0; i < right_shore.size(); ++i)
+		{
+			hash_combine(seed, right_shore.items_at(i));
+		}
+		return seed;
+	}
 };
+
+struct ShoreStateHasher {
+	size_t operator()(const ShoreState& S) const
+	{
+		return S.hash_code();
+	}
+};
+
 deque<ShoreState> depth_first_search(const ShoreState& a)
 {
 	deque<ShoreState> states_under_examination;
-	deque<ShoreState> solution;
+	ShoreState next_step_to_solution;
 	int number_of_steps = 0;
-	unordered_map<ShoreState, tuple<int, ShoreState*>> states_already_examined;
+	unordered_map<ShoreState, tuple<int, ShoreState>, ShoreStateHasher> states_already_examined;
 	ShoreState root = a;
 	states_under_examination.push_front(root);
+	states_under_examination.front().expandNode();
 	while (!states_under_examination.empty())
 	{
-		if (states_under_examination.front().has_children())
+		unordered_map<ShoreState, tuple<int, ShoreState>, ShoreStateHasher>::const_iterator got = states_already_examined.find(states_under_examination.front());
+		if (got == states_already_examined.end())
 		{
-			unordered_map<ShoreState, tuple<int, deque<ShoreState>>>::const_iterator got = states_already_examined.find(states_under_examination.front().get_child());
-			if (got == states_already_examined.end())
+			
+			if (states_under_examination.front().has_children())
 			{
 				states_under_examination.push_front(states_under_examination.front().pop_child());
 				states_under_examination.front().expandNode();
 			}
 			else
 			{
-
+				if (states_under_examination.front().is_shorestate_soln())
+				{
+					states_already_examined.insert(make_pair(states_under_examination.front(), make_tuple(0, ShoreState())));
+				}
+				else
+				{
+					states_already_examined.insert(make_pair(states_under_examination.front(), make_tuple(-1, ShoreState())));
+				}
+				states_under_examination.pop_front();
 			}
 		}
 		else
 		{
-
+			states_under_examination.pop_front();
 		}
 	}
 }
