@@ -1,8 +1,9 @@
-#include <deque>
+#include <stack>
+#include <queue>
 #include <unordered_set>
 #include <unordered_map>
 #include <vector>
-#include <tuple>
+#include <utility>
 #include <stdexcept>
 #include <algorithm>
 #include <cstddef>
@@ -172,9 +173,9 @@ private:
 	Shore right_shore;
 	static vector<int> left_shore_moves;
 	static vector<int> right_shore_moves;
-	deque<ShoreState*> children;
-	ShoreState* parent;
+	queue<ShoreState*> children;
 public:
+	pair<int, ShoreState*> best_soln;
 	static void set_moves(const vector<int>& a, const vector<int>& b)
 	{
 		left_shore_moves = a;
@@ -182,9 +183,9 @@ public:
 	}
 	ShoreState()
 	{
-		parent = NULL;
+		best_soln = make_pair(-1, this);
 	}
-	ShoreState(vector<int>& a, vector<int>& b, ShoreState* c):left_shore(a), right_shore(b), parent(c)
+	ShoreState(vector<int>& a, vector<int>& b, ShoreState* c):left_shore(a), right_shore(b), best_soln(make_pair(-1, c))
 	{
 		;
 	}
@@ -192,7 +193,7 @@ public:
 	{
 		left_shore = a;
 		right_shore = b;
-		parent = c;
+		best_soln = make_pair(-1, c);
 	}
 	~ShoreState()
 	{
@@ -234,7 +235,7 @@ public:
 					{
 						left_shore.types_from(left_shore_counter, left_shore_moves);
 						right_shore.types_to(right_shore_counter, right_shore_moves);
-						children.push_front(new ShoreState(this->left_shore, this->right_shore, this));
+						children.push(new ShoreState(this->left_shore, this->right_shore, this));
 						left_shore.types_to(left_shore_counter, left_shore_moves);
 						right_shore.types_from(right_shore_counter, right_shore_moves);
 					}
@@ -258,21 +259,14 @@ public:
 			}
 		}
 	}
-	deque<ShoreState*> tracert()
-	{
-		deque<ShoreState*> root_to_soln;
-		ShoreState* s = this;
-		while (s->parent != NULL)
-		{
-			root_to_soln.push_front(s);
-			s = s->parent;
-		}
-		return root_to_soln;
-	}
 	ShoreState get_child() const
 	{
 		// Ensuring no dynamically created copies are visible outside the class.
-		ShoreState a = *children.front()
+		ShoreState a;
+		if (!chilren.empty()) // Checking for queue
+		{
+			ShoreState a = *children.front();
+		}
 		return a;
 	}
 	bool has_children() const
@@ -282,9 +276,13 @@ public:
 	ShoreState pop_child()
 	{
 		// Ensuring no dynamically created copies are visible outside the class.
-		ShoreState a = *(children.front());
-		delete children.front();
-		children.pop_front();
+		ShoreState a;
+		if (!children.empty())
+		{
+			a = *(children.front());
+			delete children.front();
+			children.pop();
+		}
 		return a;
 	}
 	bool is_shorestate_soln() const
@@ -293,7 +291,7 @@ public:
 	}
 	size_t hash_code() const
 	{
-		size_t seed = left_shore.size() + right_shore.size();
+		size_t seed = hash<int>()(left_shore.size() + right_shore.size());
 		for (int i = 0; i < left_shore.size(); ++i)
 		{
 			hash_combine(seed, left_shore.items_at(i));
@@ -315,41 +313,49 @@ struct ShoreStateHasher {
 
 deque<ShoreState> depth_first_search(const ShoreState& a)
 {
-	deque<ShoreState> states_under_examination;
-	ShoreState next_step_to_solution;
-	int number_of_steps = 0;
-	unordered_map<ShoreState, tuple<int, ShoreState>, ShoreStateHasher> states_already_examined;
+	stack<ShoreState> states_under_examination;
+	unordered_map<ShoreState, pair<int, ShoreState>, ShoreStateHasher> states_already_examined;
 	ShoreState root = a;
-	states_under_examination.push_front(root);
-	states_under_examination.front().expandNode();
+	unordered_map<ShoreState, pair<int, ShoreState>, ShoreStateHasher>::const_iterator got;
+	states_under_examination.push(root);
 	while (!states_under_examination.empty())
 	{
-		unordered_map<ShoreState, tuple<int, ShoreState>, ShoreStateHasher>::const_iterator got = states_already_examined.find(states_under_examination.front());
-		if (got == states_already_examined.end())
+		root.expandNode();
+		if (root.has_children())
 		{
-			
-			if (states_under_examination.front().has_children())
+			got = states_already_examined.find(root.get_child());
+			if (got == states_already_examined.end())
 			{
-				states_under_examination.push_front(states_under_examination.front().pop_child());
-				states_under_examination.front().expandNode();
+				states_already_examined.push(root.get_child());
 			}
 			else
 			{
-				if (states_under_examination.front().is_shorestate_soln())
+				ShoreState a = root.pop_child();
+				if (get<0>(states_already_examined.at(a)) > get<0>(root.best_soln))
 				{
-					states_already_examined.insert(make_pair(states_under_examination.front(), make_tuple(0, ShoreState())));
+					root.best_soln = make_pair(get<0>(states_already_examined.at(a)) + 1, a);
 				}
-				else
-				{
-					states_already_examined.insert(make_pair(states_under_examination.front(), make_tuple(-1, ShoreState())));
-				}
-				states_under_examination.pop_front();
 			}
 		}
 		else
 		{
-			states_under_examination.pop_front();
+			if (get<1>(root.best_soln) == &root)
+			{
+				if (root.is_shorestate_soln())
+				{
+					states_already_examined.insert(make_pair(root, make_pair(0, *root));
+				}
+				else
+				{
+					states_already_examined.insert(make_pair(root, make_pair(-1, *root));
+				}
+			}
+			else
+			{
+				states_already_examined.insert(make_pair(root, root.best_soln()));
+			}
 		}
+		root = states_under_examination.top();
 	}
 }
 void main()
