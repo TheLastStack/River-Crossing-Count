@@ -195,12 +195,14 @@ public:
 		right_shore = b;
 		best_soln = make_pair(-1, c);
 	}
-	~ShoreState()
+	void closeNodes()
 	{
 		for (auto i : children)
 		{
-			delete i;
+			delete i
 		}
+		queue<ShoreState*> empty;
+		swap(children, empty);
 	}
 	bool operator==(const ShoreState& a)
 	{
@@ -311,27 +313,36 @@ struct ShoreStateHasher {
 	}
 };
 
-deque<ShoreState> depth_first_search(const ShoreState& a)
+stack<ShoreState> depth_first_search(const ShoreState& a) const
 {
 	stack<ShoreState> states_under_examination;
 	unordered_map<ShoreState, pair<int, ShoreState>, ShoreStateHasher> states_already_examined;
 	ShoreState root = a;
 	unordered_map<ShoreState, pair<int, ShoreState>, ShoreStateHasher>::const_iterator got;
+	ShoreState a;
 	states_under_examination.push(root);
 	while (!states_under_examination.empty())
 	{
-		root.expandNode();
+		root = states_under_examination.top();
+		try 
+		{
+			root.expandNode();
+		}
+		catch (bad_alloc&)
+		{
+			//TODO: Managing a fail in (new)
+		}
 		if (root.has_children())
 		{
 			got = states_already_examined.find(root.get_child());
 			if (got == states_already_examined.end())
 			{
-				states_already_examined.push(root.get_child());
+				states_under_examination.push(root.get_child());
 			}
 			else
 			{
-				ShoreState a = root.pop_child();
-				if (get<0>(states_already_examined.at(a)) > get<0>(root.best_soln))
+				a = root.pop_child();
+				if (get<0>(states_already_examined.at(a)) != -1 && get<0>(states_already_examined.at(a)) < get<0>(root.best_soln))
 				{
 					root.best_soln = make_pair(get<0>(states_already_examined.at(a)) + 1, a);
 				}
@@ -352,10 +363,11 @@ deque<ShoreState> depth_first_search(const ShoreState& a)
 			}
 			else
 			{
-				states_already_examined.insert(make_pair(root, root.best_soln()));
+				states_already_examined.insert(make_pair(root, root.best_soln));
 			}
+			root.closeNodes();
+			states_under_examination.pop();
 		}
-		root = states_under_examination.top();
 	}
 }
 void main()
