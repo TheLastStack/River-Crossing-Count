@@ -1,5 +1,4 @@
 #include "solveShoreProblem.h"
-#include <iostream>
 
 using namespace std;
 
@@ -251,17 +250,6 @@ void ShoreState::expandNode()
 						{
 							right_shore.types_from(right_shore_counter, local_rsm);
 							left_shore.types_to(right_shore_counter, local_rsm);
-							cout << "Selected move:" << endl;
-							for (auto i : left_shore.to_vector())
-							{
-								cout << i;
-							}
-							cout << endl;
-							for (auto i : right_shore.to_vector())
-							{
-								cout << i;
-							}
-							cout << endl;
 							if (already_done.find(*this) == already_done.end() && !(*this == local_check))
 							{
 								children.push(new ShoreState(this->left_shore, this->right_shore));
@@ -437,8 +425,6 @@ queue<ShoreState> depth_first_search(const ShoreState& a)
 			}
 			else
 			{
-				cout << get<1>(states_under_examination.top().best_soln);
-				cout << &states_under_examination.top()<<endl;
 				if (get<1>(states_under_examination.top().best_soln) == &states_under_examination.top())
 				{
 					states_under_examination.top().expandNode();
@@ -473,55 +459,10 @@ queue<ShoreState> depth_first_search(const ShoreState& a)
 			}
 		}
 	}
-	cout << "Examining built tree:" << endl;
-	pair<Shore, Shore> sh;
-	for (auto it = states_already_examined.cbegin(); it != states_already_examined.cend(); ++it)
-	{
-		cout << "State:" << endl;
-		root = it->first;
-		sh = root.get_state();
-		for (auto i : get<0>(sh).to_vector())
-		{
-			cout << i;
-		}
-		cout << endl << get<0>(sh).number_of_types_crossed() << " " << get<0>(sh).size() << endl;
-		for (auto i : get<1>(sh).to_vector())
-		{
-			cout << i;
-		}
-		cout << endl;
-		cout << "Points to:" << endl;
-		root = get<1>(it->second);
-		sh = root.get_state();
-		for (auto i : get<0>(sh).to_vector())
-		{
-			cout << i;
-		}
-		cout << endl;
-		for (auto i : get<1>(sh).to_vector())
-		{
-			cout << i;
-		}
-		cout << endl << "Steps to solution:" << get<0>(it->second) << endl;
-		cout << endl;
-	}
-	cout<<endl;
 	check = a;
-	sh = check.get_state();
-	for (auto i : get<0>(sh).to_vector())
-	{
-		cout << i;
-	}
-	cout << endl << endl;
 	while (!(get<0>(states_already_examined.at(check)) <= 0))
 	{
 		answer.push(check);
-		sh = check.get_state();
-		for (auto i : get<0>(sh).to_vector())
-		{
-			cout << i;
-		}
-		cout << endl << get<0>(states_already_examined.at(check)) << endl;
 		check = get<1>(states_already_examined.at(check));
 	}
 	answer.push(root);
