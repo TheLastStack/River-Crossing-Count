@@ -14,9 +14,9 @@ bool next_combination(vector<int>& counter, int limit)
 	bool returning = true;
 	if (counter[0] >= limit - counter.size())
 	{
-		for (int i = 0; i < counter.size(); ++i)
+		for (size_t i = 0; i < counter.size(); ++i)
 		{
-			counter[i] = i;
+			counter[i] = (int)i;
 		}
 		returning = false;
 	}
@@ -37,7 +37,7 @@ bool next_combination(vector<int>& counter, int limit)
 				while (i > 0 && counter[i] - counter[i - 1] == 1)
 					--i;
 				counter[i - 1] += 1;
-				for (int j = i; j < counter.size(); ++j)
+				for (size_t j = i; j < counter.size(); ++j)
 				{
 					counter[j] = counter[j - 1] + 1;
 				}
@@ -57,7 +57,7 @@ void Shore::from(Shore* s, const vector<int>& a, const vector<int>& b)
 		}
 		s->items_of_type[a[i]] -= b[i];
 		if (s->items_of_type[a[i]] == 0)
-			(s->all_crossed_type).insert(i);
+			(s->all_crossed_type).insert(a[i]);
 	}
 }
 
@@ -72,11 +72,9 @@ void Shore::to(Shore* s, const vector<int>& a, const vector<int>& b)
 }
 
 Shore::Shore()
-{
-	;
-}
+{}
 
-Shore::Shore(vector<int>& a) :items_of_type(a)
+Shore::Shore(vector<int>& a) : items_of_type(a)
 {
 	for (int i = 0; i < items_of_type.size(); ++i)
 	{
@@ -85,16 +83,11 @@ Shore::Shore(vector<int>& a) :items_of_type(a)
 	}
 }
 
-Shore::Shore(vector<int>& a, unordered_set<int>& b) :items_of_type(a)
-{
-	all_crossed_type = b;
-}
+Shore::Shore(vector<int>& a, unordered_set<int>& b) : items_of_type(a), all_crossed_type(b)
+{}
 
-Shore::Shore(const Shore& a)
-{
-	items_of_type = a.items_of_type;
-	all_crossed_type = a.all_crossed_type;
-}
+Shore::Shore(const Shore& a) : items_of_type(a.items_of_type), all_crossed_type(a.all_crossed_type)
+{}
 
 void Shore::types_from(const vector<int>& a, const vector<int>& b)
 {
@@ -188,10 +181,8 @@ ShoreState::ShoreState(const Shore& a, const Shore& b) : left_shore(a), right_sh
 	best_soln = make_pair(-1, this);
 }
 
-ShoreState::ShoreState(const ShoreState& a)
+ShoreState::ShoreState(const ShoreState& a) : left_shore(a.left_shore), right_shore(a.right_shore), children(a.children), children_extracted(a.children_extracted)
 {
-	this->left_shore = a.left_shore;
-	this->right_shore = a.right_shore;
 	if (get<0>(a.best_soln) < 1)
 	{
 		this->best_soln = make_pair(get<0>(a.best_soln), this);
@@ -200,8 +191,6 @@ ShoreState::ShoreState(const ShoreState& a)
 	{
 		this->best_soln = a.best_soln;
 	}
-	this->children = a.children;
-	this->children_extracted = a.children_extracted;
 }
 
 void ShoreState::closeNodes()
@@ -226,58 +215,103 @@ void ShoreState::expandNode()
 {
 	vector<int> left_shore_counter(left_shore_moves.size(), 0);
 	vector<int> right_shore_counter(right_shore_moves.size(), 0);
+	unordered_set<ShoreState, ShoreStateHasher> already_done;
 	bool valid_state = true, outer_loop = true, inner_loop = true;
-	for (int i = 1; i < left_shore_counter.size(); ++i)
-		left_shore_counter[i] = i;
-	for (int i = 1; i < right_shore_counter.size(); ++i)
-		right_shore_counter[i] = i;
-	while (outer_loop)
+	vector<int> local_lsm(left_shore_moves.size(), 0);
+	vector<int> local_rsm(right_shore_moves.size(), 0);
+	ShoreState local_check = *this;
+	local_lsm.back() += 1;
+	while (local_lsm[0] <= left_shore_moves[0])
 	{
-		for (int i = 0; i < left_shore_counter.size(); ++i)
+		while (local_rsm[0] <= right_shore_moves[0] && accumulate(local_lsm.cbegin(), local_lsm.cend(), 0) > accumulate(local_rsm.cbegin(), local_rsm.cend(), 0))
 		{
-			if (left_shore.items_at(left_shore_counter[i]) - left_shore_moves[i] < 0)
-				valid_state = false;
-		}
-		if (valid_state)
-		{
-			while (inner_loop)
+			for (int i = 0; i < left_shore_counter.size(); ++i)
+				left_shore_counter[i] = i;
+			for (int i = 0; i < right_shore_counter.size(); ++i)
+				right_shore_counter[i] = i;
+			while (outer_loop)
 			{
-
-				left_shore.types_from(left_shore_counter, left_shore_moves);
-				right_shore.types_to(left_shore_counter, left_shore_moves);
-				for (int i = 0; i < right_shore_counter.size(); ++i)
+				for (int i = 0; i < left_shore_counter.size(); ++i)
 				{
-					if (right_shore.items_at(right_shore_counter[i]) - right_shore_moves[i] < 0)
+					if (left_shore.items_at(left_shore_counter[i]) - local_lsm[i] < 0)
 						valid_state = false;
 				}
-				cout << valid_state << endl;
 				if (valid_state)
 				{
-					right_shore.types_from(right_shore_counter, right_shore_moves);
-					left_shore.types_to(right_shore_counter, right_shore_moves);
-					children.push(new ShoreState(this->left_shore, this->right_shore));
-					left_shore.types_from(right_shore_counter, right_shore_moves);
-					right_shore.types_to(right_shore_counter, right_shore_moves);
+					while (inner_loop)
+					{
+						left_shore.types_from(left_shore_counter, local_lsm);
+						right_shore.types_to(left_shore_counter, local_lsm);
+						for (int i = 0; i < right_shore_counter.size(); ++i)
+						{
+							if (right_shore.items_at(right_shore_counter[i]) - local_rsm[i] < 0)
+								valid_state = false;
+						}
+						if (valid_state)
+						{
+							right_shore.types_from(right_shore_counter, local_rsm);
+							left_shore.types_to(right_shore_counter, local_rsm);
+							cout << "Selected move:" << endl;
+							for (auto i : left_shore.to_vector())
+							{
+								cout << i;
+							}
+							cout << endl;
+							for (auto i : right_shore.to_vector())
+							{
+								cout << i;
+							}
+							cout << endl;
+							if (already_done.find(*this) == already_done.end() && !(*this == local_check))
+							{
+								children.push(new ShoreState(this->left_shore, this->right_shore));
+								already_done.insert(ShoreState(this->left_shore, this->right_shore));
+							}
+							left_shore.types_from(right_shore_counter, local_rsm);
+							right_shore.types_to(right_shore_counter, local_rsm);
+						}
+						else
+						{
+							valid_state = true;
+						}
+						left_shore.types_to(left_shore_counter, local_lsm);
+						right_shore.types_from(left_shore_counter, local_lsm);
+						if (!next_permutation(right_shore_counter.begin(), right_shore_counter.end()))
+						{
+							inner_loop = next_combination(right_shore_counter, (int)right_shore.size());
+						}
+					}
 				}
 				else
 				{
 					valid_state = true;
 				}
-				left_shore.types_to(left_shore_counter, left_shore_moves);
-				right_shore.types_from(left_shore_counter, left_shore_moves);
-				if (!next_permutation(right_shore_counter.begin(), right_shore_counter.end()))
+				if (!next_permutation(left_shore_counter.begin(), left_shore_counter.end()))
 				{
-					inner_loop = next_combination(right_shore_counter, right_shore.size());
+					outer_loop = next_combination(left_shore_counter, (int)left_shore.size());
+				}
+				inner_loop = true;
+			}
+			local_rsm.back() += 1;
+			outer_loop = true;
+			for (size_t i = local_rsm.size() - 1; i > 0; --i)
+			{
+				if (local_rsm[i] > right_shore_moves[i])
+				{
+					local_rsm[i] = 0;
+					local_rsm[i - 1] += 1;
 				}
 			}
 		}
-		else
+		local_lsm.back() += 1;
+		local_rsm.assign(local_rsm.size(), 0);
+		for (size_t i = local_lsm.size() - 1; i > 0; --i)
 		{
-			valid_state = true;
-		}
-		if (!next_permutation(left_shore_counter.begin(), left_shore_counter.end()))
-		{
-			outer_loop = next_combination(left_shore_counter, left_shore.size());
+			if (local_lsm[i] > left_shore_moves[i])
+			{
+				local_lsm[i] = 0;
+				local_lsm[i - 1] += 1;
+			}
 		}
 	}
 }
@@ -332,7 +366,7 @@ bool ShoreState::is_shorestate_soln() const
 
 size_t ShoreState::hash_code() const
 {
-	size_t seed = hash<int>()(left_shore.size() + right_shore.size());
+	size_t seed = hash<size_t>()(left_shore.size() + right_shore.size());
 	for (int i = 0; i < left_shore.size(); ++i)
 	{
 		hash_combine(seed, left_shore.items_at(i));
@@ -354,28 +388,28 @@ bool ShoreState::examined_children() const
 	return children_extracted >= children.size();
 }
 
-stack<ShoreState> depth_first_search(const ShoreState& a)
+queue<ShoreState> depth_first_search(const ShoreState& a)
 {
 	stack<ShoreState> states_under_examination;
-	stack<ShoreState> answer;
+	queue<ShoreState> answer;
 	unordered_map<ShoreState, pair<int, ShoreState>, ShoreStateHasher> states_already_examined;
 	ShoreState root = a;
 	unordered_map<ShoreState, pair<int, ShoreState>, ShoreStateHasher>::const_iterator got;
-	ShoreState check;
+	ShoreState& check = root;
 	ShoreState* dyn = NULL;
 	states_under_examination.push(root);
 	while (!states_under_examination.empty())
 	{
 		if (states_under_examination.top().is_shorestate_soln())
 		{
-			states_under_examination.top().closeNodes();
 			states_already_examined.insert(make_pair(states_under_examination.top(), make_pair(0, states_under_examination.top())));
+			dyn = new ShoreState(states_under_examination.top());
 			states_under_examination.pop();
+			states_under_examination.top().best_soln = make_pair(1, dyn);
 		}
 		else if ((got = states_already_examined.find(states_under_examination.top())) != states_already_examined.end())
 		{
 			dyn = new ShoreState(states_under_examination.top());
-			states_under_examination.top().closeNodes();
 			states_under_examination.pop();
 			if (get<1>(states_under_examination.top().best_soln) == &states_under_examination.top() && get<0>(dyn->best_soln) == -1)
 			{
@@ -383,6 +417,8 @@ stack<ShoreState> depth_first_search(const ShoreState& a)
 			}
 			if (get<0>(dyn->best_soln) != -1 && get<0>(states_under_examination.top().best_soln) > get<0>(dyn->best_soln))
 			{
+				if (get<1>(states_under_examination.top().best_soln) != &states_under_examination.top())
+					delete get<1>(states_under_examination.top().best_soln);
 				states_under_examination.top().best_soln = make_pair(get<0>(dyn->best_soln) + 1, dyn);
 			}
 		}
@@ -419,8 +455,20 @@ stack<ShoreState> depth_first_search(const ShoreState& a)
 				}
 				else
 				{
-					states_already_examined.insert(make_pair(states_under_examination.top(), make_pair(get<0>(states_under_examination.top().best_soln), *get<1>(states_under_examination.top().best_soln))));
+					states_already_examined.insert(make_pair(states_under_examination.top(), make_pair(get<0>(states_under_examination.top().best_soln), ShoreState(*get<1>(states_under_examination.top().best_soln)))));
+					dyn = new ShoreState(states_under_examination.top());
+					int solution = get<0>(states_under_examination.top().best_soln);
+					if (solution == -1)
+					{
+						states_under_examination.top().closeNodes();
+					}
 					states_under_examination.pop();
+					if (!states_under_examination.empty() && solution != -1)
+					{
+						if (get<1>(states_under_examination.top().best_soln) != &states_under_examination.top())
+							delete get<1>(states_under_examination.top().best_soln);
+						states_under_examination.top().best_soln = make_pair(solution + 1, dyn);
+					}
 				}
 			}
 		}
@@ -436,7 +484,7 @@ stack<ShoreState> depth_first_search(const ShoreState& a)
 		{
 			cout << i;
 		}
-		cout << endl;
+		cout << endl << get<0>(sh).number_of_types_crossed() << " " << get<0>(sh).size() << endl;
 		for (auto i : get<1>(sh).to_vector())
 		{
 			cout << i;
@@ -444,6 +492,7 @@ stack<ShoreState> depth_first_search(const ShoreState& a)
 		cout << endl;
 		cout << "Points to:" << endl;
 		root = get<1>(it->second);
+		sh = root.get_state();
 		for (auto i : get<0>(sh).to_vector())
 		{
 			cout << i;
@@ -457,11 +506,23 @@ stack<ShoreState> depth_first_search(const ShoreState& a)
 		cout << endl;
 	}
 	cout<<endl;
-	root = a;
-	while (!(get<0>(states_already_examined.at(root)) <= 0))
+	check = a;
+	sh = check.get_state();
+	for (auto i : get<0>(sh).to_vector())
 	{
-		answer.push(root);
-		root = get<1>(states_already_examined.at(root));
+		cout << i;
+	}
+	cout << endl << endl;
+	while (!(get<0>(states_already_examined.at(check)) <= 0))
+	{
+		answer.push(check);
+		sh = check.get_state();
+		for (auto i : get<0>(sh).to_vector())
+		{
+			cout << i;
+		}
+		cout << endl << get<0>(states_already_examined.at(check)) << endl;
+		check = get<1>(states_already_examined.at(check));
 	}
 	answer.push(root);
 	return answer;

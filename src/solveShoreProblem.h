@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <vector>
 #include <utility>
+#include <numeric>
 #include <stdexcept>
 #include <cstddef>
 #include <limits>
@@ -76,6 +77,6 @@ struct ShoreStateHasher {
 };
 
 bool next_combination(std::vector<int>& counter, int limit);
-std::stack<ShoreState> depth_first_search(const ShoreState& a);
+std::queue<ShoreState> depth_first_search(const ShoreState& a);
 
 #endif
