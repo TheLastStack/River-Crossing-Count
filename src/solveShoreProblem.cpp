@@ -466,5 +466,9 @@ queue<ShoreState> depth_first_search(const ShoreState& a)
 		check = get<1>(states_already_examined.at(check));
 	}
 	answer.push(root);
+	for (auto& it: states_already_examined)
+	{
+		get<1>(it.second).closeNodes();
+	}
 	return answer;
 }
